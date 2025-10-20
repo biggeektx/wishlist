@@ -1,0 +1,63 @@
+<div class="max-w-2xl">
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">New Income Source</h1>
+
+  <%= form_with(model: @income, class: "space-y-6") do |f| %>
+    <% if @income.errors.any? %>
+      <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+        <h3 class="font-medium">Errors:</h3>
+        <ul class="list-disc list-inside">
+          <% @income.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :description, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_field :description, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :amount, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.number_field :amount, step: 0.01, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :frequency, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.select :frequency, Income::FREQUENCIES.map { |k, v| [v, k] }, {}, { class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500", id: "frequency_select" } %>
+    </div>
+
+    <div id="frequency_day_field" style="display: none;">
+      <%= f.label :frequency_day, "Day of Month", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.number_field :frequency_day, min: 1, max: 31, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div id="start_date_field" style="display: none;">
+      <%= f.label :start_date, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.date_field :start_date, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div class="flex space-x-3">
+      <%= f.submit "Create Income", class: "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium" %>
+      <%= link_to "Cancel", incomes_path, class: "bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium" %>
+    </div>
+  <% end %>
+
+  <script>
+    document.addEventListener('turbo:load', function() {
+      const select = document.getElementById('frequency_select');
+      const frequencyDayField = document.getElementById('frequency_day_field');
+      const startDateField = document.getElementById('start_date_field');
+
+      function updateFields() {
+        const value = select.value;
+        frequencyDayField.style.display = value === 'specific_date' ? 'block' : 'none';
+        startDateField.style.display = value === 'biweekly' ? 'block' : 'none';
+      }
+
+      select.addEventListener('change', updateFields);
+      updateFields();
+    });
+  </script>
+</div>

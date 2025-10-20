@@ -1,0 +1,54 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h1 class="text-3xl font-bold text-gray-900">Wish List Items</h1>
+    <%= link_to "Add Item", new_wish_list_item_path, class: "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium" %>
+  </div>
+
+  <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <ul class="divide-y divide-gray-200">
+      <% @wish_list_items.each do |item| %>
+        <li>
+          <div class="px-4 py-4 sm:px-6">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <p class="text-lg font-medium text-indigo-600"><%= item.name %></p>
+                <div class="mt-2 sm:flex sm:justify-between">
+                  <div class="sm:flex">
+                    <p class="flex items-center text-sm text-gray-500">
+                      Cost: <%= number_to_currency(item.cost) %>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                      Type: <span class="ml-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full <%= item.item_type == 'target_date' ? 'bg-red-100 text-red-800' : item.item_type == 'sequential' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800' %>">
+                        <%= item.item_type.humanize %>
+                      </span>
+                    </p>
+                    <% if item.item_type == 'target_date' && item.target_date %>
+                      <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                        Target: <%= item.target_date.strftime('%B %d, %Y') %>
+                      </p>
+                    <% elsif item.item_type == 'sequential' %>
+                      <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                        Order: #<%= item.sequential_order %>
+                      </p>
+                    <% elsif item.item_type == 'percentage' %>
+                      <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                        Priority: <%= item.percentage %>%
+                      </p>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+              <div class="ml-5 flex-shrink-0 flex space-x-2">
+                <% unless item.purchased? %>
+                  <%= button_to "Mark Purchased", mark_as_purchased_wish_list_item_path(item), method: :post, class: "text-green-600 hover:text-green-900 text-sm" %>
+                <% end %>
+                <%= link_to "Edit", edit_wish_list_item_path(item), class: "text-indigo-600 hover:text-indigo-900 text-sm" %>
+                <%= button_to "Delete", wish_list_item_path(item), method: :delete, data: { confirm: "Are you sure?" }, class: "text-red-600 hover:text-red-900 text-sm" %>
+              </div>
+            </div>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</div>

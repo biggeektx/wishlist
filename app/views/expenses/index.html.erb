@@ -1,0 +1,39 @@
+<div class="space-y-6">
+  <div class="flex justify-between items-center">
+    <h1 class="text-3xl font-bold text-gray-900">Expenses</h1>
+    <%= link_to "Add Expense", new_expense_path, class: "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium" %>
+  </div>
+
+  <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <ul class="divide-y divide-gray-200">
+      <% @expenses.each do |expense| %>
+        <li>
+          <div class="px-4 py-4 sm:px-6">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <p class="text-lg font-medium text-indigo-600"><%= expense.description %></p>
+                <div class="mt-2 sm:flex sm:justify-between">
+                  <div class="sm:flex">
+                    <p class="flex items-center text-sm text-gray-500">
+                      Amount: <%= number_to_currency(expense.amount) %>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                      Date: <%= expense.expense_date.strftime('%B %d, %Y') %>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm <%= expense.expense_date < Date.current ? 'text-gray-400' : 'text-green-600' %> sm:mt-0 sm:ml-6">
+                      <%= expense.expense_date < Date.current ? 'Past' : 'Upcoming' %>
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="ml-5 flex-shrink-0 flex space-x-2">
+                <%= link_to "Edit", edit_expense_path(expense), class: "text-indigo-600 hover:text-indigo-900 text-sm" %>
+                <%= button_to "Delete", expense_path(expense), method: :delete, data: { confirm: "Are you sure?" }, class: "text-red-600 hover:text-red-900 text-sm" %>
+              </div>
+            </div>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</div>

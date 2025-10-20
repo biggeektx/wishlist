@@ -1,0 +1,70 @@
+<div class="max-w-2xl">
+  <h1 class="text-3xl font-bold text-gray-900 mb-6">Edit Wish List Item</h1>
+
+  <%= form_with(model: @wish_list_item, class: "space-y-6") do |f| %>
+    <% if @wish_list_item.errors.any? %>
+      <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+        <h3 class="font-medium">Errors:</h3>
+        <ul class="list-disc list-inside">
+          <% @wish_list_item.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= f.label :name, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.text_field :name, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :cost, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.number_field :cost, step: 0.01, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div>
+      <%= f.label :item_type, "Type", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.select :item_type, [["Target Date", "target_date"], ["Sequential", "sequential"], ["Percentage", "percentage"]], {}, { class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500", id: "item_type_select" } %>
+    </div>
+
+    <div id="target_date_field">
+      <%= f.label :target_date, class: "block text-sm font-medium text-gray-700" %>
+      <%= f.date_field :target_date, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div id="sequential_field">
+      <%= f.label :sequential_order, "Order", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.number_field :sequential_order, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div id="percentage_field">
+      <%= f.label :percentage, "Priority Percentage", class: "block text-sm font-medium text-gray-700" %>
+      <%= f.number_field :percentage, step: 0.01, max: 100, class: "mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" %>
+    </div>
+
+    <div class="flex space-x-3">
+      <%= f.submit "Update Wish List Item", class: "bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium" %>
+      <%= link_to "Cancel", wish_list_items_path, class: "bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium" %>
+    </div>
+  <% end %>
+
+  <script>
+    document.addEventListener('turbo:load', function() {
+      const select = document.getElementById('item_type_select');
+      const targetDateField = document.getElementById('target_date_field');
+      const sequentialField = document.getElementById('sequential_field');
+      const percentageField = document.getElementById('percentage_field');
+
+      function updateFields() {
+        const value = select.value;
+        targetDateField.style.display = value === 'target_date' ? 'block' : 'none';
+        sequentialField.style.display = value === 'sequential' ? 'block' : 'none';
+        percentageField.style.display = value === 'percentage' ? 'block' : 'none';
+      }
+
+      select.addEventListener('change', updateFields);
+      updateFields();
+    });
+  </script>
+</div>

@@ -1,0 +1,32 @@
+<div class="space-y-6">
+  <h1 class="text-3xl font-bold text-gray-900">Purchase History</h1>
+
+  <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <ul class="divide-y divide-gray-200">
+      <% @purchases.each do |purchase| %>
+        <li>
+          <div class="px-4 py-4 sm:px-6">
+            <div class="flex items-center justify-between">
+              <div class="flex-1">
+                <p class="text-lg font-medium text-indigo-600"><%= purchase.wish_list_item.name %></p>
+                <div class="mt-2 sm:flex sm:justify-between">
+                  <div class="sm:flex">
+                    <p class="flex items-center text-sm text-gray-500">
+                      Amount: <%= number_to_currency(purchase.amount) %>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                      Purchased: <%= purchase.purchased_at.strftime('%B %d, %Y') %>
+                    </p>
+                  </div>
+                </div>
+                <% if purchase.notes.present? %>
+                  <p class="mt-2 text-sm text-gray-600"><%= purchase.notes %></p>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  </div>
+</div>
