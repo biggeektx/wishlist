@@ -127,10 +127,18 @@ class WishListItemsController < ApplicationController
   end
 
   def mark_as_purchased
-    if @wish_list_item.mark_as_purchased!(@wish_list_item.cost)
-      redirect_to wish_list_items_path, notice: "Item marked as purchased!"
+    amount = params[:amount]&.to_f || @wish_list_item.cost
+
+    if @wish_list_item.mark_as_purchased!(amount)
+      respond_to do |format|
+        format.html { redirect_to wish_list_items_path, notice: "Item marked as purchased!" }
+        format.json { render json: { success: true, message: "Item marked as purchased!" }, status: :ok }
+      end
     else
-      redirect_to wish_list_items_path, alert: "Failed to mark item as purchased."
+      respond_to do |format|
+        format.html { redirect_to wish_list_items_path, alert: "Failed to mark item as purchased." }
+        format.json { render json: { success: false, error: "Failed to mark item as purchased." }, status: :unprocessable_entity }
+      end
     end
   end
 
