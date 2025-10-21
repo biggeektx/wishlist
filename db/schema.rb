@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_20_225321) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_21_220025) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_20_225321) do
     t.date "start_date"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.date "one_time_date"
     t.index ["user_id", "frequency"], name: "index_incomes_on_user_id_and_frequency"
     t.index ["user_id"], name: "index_incomes_on_user_id"
   end

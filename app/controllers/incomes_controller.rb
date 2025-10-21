@@ -43,6 +43,6 @@ class IncomesController < ApplicationController
   end
 
   def income_params
-    params.require(:income).permit(:description, :amount, :frequency, :frequency_day, :start_date)
+    params.require(:income).permit(:description, :amount, :frequency, :frequency_day, :start_date, :one_time_date)
   end
 end
