@@ -1,9 +1,12 @@
 class AllocationCalculator
-  attr_reader :user, :end_date
+  attr_reader :user, :end_date, :temp_items, :bumped_sequential, :rebalanced_percentages
 
-  def initialize(user, end_date = 2.years.from_now.to_date)
+  def initialize(user, end_date = 2.years.from_now.to_date, temp_items: [], bumped_sequential: nil, rebalanced_percentages: nil)
     @user = user
     @end_date = end_date
+    @temp_items = temp_items
+    @bumped_sequential = bumped_sequential
+    @rebalanced_percentages = rebalanced_percentages
   end
 
   def calculate
@@ -13,10 +16,31 @@ class AllocationCalculator
     # Get future expenses
     expense_schedule = build_expense_schedule
 
-    # Get all unpurchased items
-    target_items = user.wish_list_items.unpurchased.target_date_items.order(:target_date)
-    sequential_items = user.wish_list_items.unpurchased.sequential_items
-    percentage_items = user.wish_list_items.unpurchased.percentage_items
+    # Get all unpurchased items (including temp items for preview)
+    persisted_target = user.wish_list_items.unpurchased.target_date_items.order(:target_date).to_a
+
+    # Use rebalanced percentage items if provided (for preview), otherwise use persisted
+    persisted_percentage = if rebalanced_percentages
+      rebalanced_percentages
+    else
+      user.wish_list_items.unpurchased.percentage_items.to_a
+    end
+
+    # Use bumped sequential items if provided (for preview), otherwise use persisted
+    persisted_sequential = if bumped_sequential
+      bumped_sequential
+    else
+      user.wish_list_items.unpurchased.sequential_items.order(:sequential_order).to_a
+    end
+
+    # Add temp items to appropriate collections
+    temp_target = temp_items.select { |i| i.item_type == 'target_date' }.sort_by { |i| i.target_date || Date.current + 10.years }
+    temp_sequential = temp_items.select { |i| i.item_type == 'sequential' }
+    temp_percentage = temp_items.select { |i| i.item_type == 'percentage' }
+
+    target_items = persisted_target + temp_target
+    sequential_items = (persisted_sequential + temp_sequential).sort_by { |i| i.sequential_order || 999 }
+    percentage_items = persisted_percentage + temp_percentage
 
     # Initialize result structure
     result = {
@@ -65,7 +89,7 @@ class AllocationCalculator
 
     # Phase 3: Allocate remaining by percentage
     if percentage_items.any?
-      total_percentage = percentage_items.sum(:percentage)
+      total_percentage = percentage_items.sum { |i| i.percentage || 0 }
       percentage_items.each do |item|
         weight = item.percentage / total_percentage
         allocation = allocate_by_percentage(item, remaining_by_date, weight)
@@ -144,19 +168,63 @@ class AllocationCalculator
         amount_allocated: total_allocated.round(2),
         funded_by: allocated,
         feasible: true,
-        completion_date: allocated.last[:date]
+        completion_date: allocated.last[:date],
+        target_date: item.target_date
       }
     else
-      # Not enough income by target date
-      {
-        item_id: item.id,
-        item_name: item.name,
-        item_cost: item.cost,
-        amount_allocated: 0,
-        funded_by: [],
-        feasible: false,
-        shortfall: (needed - total_available).round(2)
-      }
+      # Not enough income by target date - find next available date
+      cumulative = 0
+      next_completion_date = nil
+
+      income_schedule.each do |income|
+        cumulative += income[:amount]
+        if cumulative >= needed
+          next_completion_date = income[:date]
+          break
+        end
+      end
+
+      # If we found a completion date after target, allocate to that date
+      if next_completion_date
+        available_extended = income_schedule.select { |i| i[:date] <= next_completion_date }
+        per_income = needed / available_extended.size
+
+        available_extended.each do |income|
+          amount = [per_income, income[:amount], needed - total_allocated].min
+          allocated << {
+            date: income[:date],
+            amount: amount.round(2),
+            income_id: income[:income_id]
+          }
+          total_allocated += amount
+          break if total_allocated >= needed
+        end
+
+        {
+          item_id: item.id,
+          item_name: item.name,
+          item_cost: item.cost,
+          amount_allocated: total_allocated.round(2),
+          funded_by: allocated,
+          feasible: true,
+          completion_date: next_completion_date,
+          target_date: item.target_date,
+          adjusted: true,
+          original_target: item.target_date
+        }
+      else
+        # Still not enough even with all income
+        {
+          item_id: item.id,
+          item_name: item.name,
+          item_cost: item.cost,
+          amount_allocated: 0,
+          funded_by: [],
+          feasible: false,
+          shortfall: (needed - income_schedule.sum { |i| i[:amount] }).round(2),
+          target_date: item.target_date
+        }
+      end
     end
   end
 

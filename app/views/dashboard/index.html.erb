@@ -58,72 +58,91 @@
         </div>
       </div>
 
-      <%
-        # Build timeline data
-        timeline_events = @allocation_result[:timeline].map do |timeline_item|
-          allocation = @allocation_result[:allocations].find { |a| a[:item_id] == timeline_item[:item].id }
-          {
-            item: timeline_item[:item],
-            date: allocation[:completion_date],
-            type: timeline_item[:item].item_type
-          }
-        end.compact.sort_by { |e| e[:date] }
-
-        min_date = timeline_events.first&.dig(:date) || Date.current
-        max_date = timeline_events.last&.dig(:date) || Date.current + 1.year
-        date_range = (max_date - min_date).to_i
-      %>
-
-      <% if timeline_events.any? %>
+      <!-- Wrap timeline and calculator in controller scope -->
+      <div data-controller="wish-calculator" data-wish-calculator-url-value="<%= preview_wish_list_items_path %>">
         <div class="bg-white shadow sm:rounded-lg">
           <div class="px-4 py-5 sm:p-6">
             <h3 class="text-lg leading-6 font-medium text-gray-900 mb-6">Funding Timeline</h3>
-
-            <!-- Timeline visualization -->
-            <div class="relative">
-              <!-- Timeline bar -->
-              <div class="absolute left-0 right-0 h-2 bg-gray-200 rounded-full" style="top: 20px;"></div>
-
-              <!-- Timeline markers -->
-              <div class="relative h-16 mb-8">
-                <% timeline_events.each_with_index do |event, index| %>
-                  <% position = ((event[:date] - min_date).to_i.to_f / date_range * 100).round(2) %>
-                  <div class="absolute" style="left: <%= position %>%; transform: translateX(-50%);">
-                    <div class="flex flex-col items-center">
-                      <div class="w-6 h-6 rounded-full <%= event[:type] == 'target_date' ? 'bg-red-500' : event[:type] == 'sequential' ? 'bg-blue-500' : 'bg-green-500' %> border-4 border-white shadow-lg relative z-10"></div>
-                      <div class="mt-2 text-xs font-medium text-gray-600 whitespace-nowrap">
-                        <%= event[:date].strftime('%b %d') %>
-                      </div>
-                    </div>
-                  </div>
-                <% end %>
-              </div>
-
-              <!-- Date labels -->
-              <div class="flex justify-between text-xs text-gray-500 mb-6">
-                <span><%= min_date.strftime('%B %Y') %></span>
-                <span><%= max_date.strftime('%B %Y') %></span>
-              </div>
-            </div>
-
-            <!-- Legend -->
-            <div class="flex items-center gap-6 mb-6 text-sm">
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded-full bg-red-500"></div>
-                <span class="text-gray-600">Target Date</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded-full bg-blue-500"></div>
-                <span class="text-gray-600">Sequential</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <div class="w-4 h-4 rounded-full bg-green-500"></div>
-                <span class="text-gray-600">Percentage</span>
-              </div>
+            <div data-wish-calculator-target="timeline">
+              <%= render partial: 'timeline', locals: { allocation_result: @allocation_result } %>
             </div>
           </div>
         </div>
-      <% end %>
+
+        <!-- Live Calculator Accordion -->
+        <div class="bg-white shadow sm:rounded-lg">
+        <button onclick="event.preventDefault(); this.closest('[data-controller]').querySelector('[data-wish-calculator-target=form]').classList.toggle('hidden')" class="w-full px-4 py-5 sm:p-6 text-left hover:bg-gray-50 transition-colors">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg leading-6 font-medium text-indigo-600">💭 Add a wish?</h3>
+            <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+            </svg>
+          </div>
+        </button>
+
+        <div data-wish-calculator-target="form" class="hidden px-4 pb-5 sm:px-6 border-t border-gray-200">
+          <div class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <!-- Name -->
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700">Item Name</label>
+              <input type="text" data-wish-calculator-target="nameInput" data-action="input->wish-calculator#updatePreview" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="e.g., New Laptop">
+            </div>
+
+            <!-- Cost -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Cost</label>
+              <input type="number" step="0.01" data-wish-calculator-target="costInput" data-action="input->wish-calculator#updatePreview" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="0.00">
+            </div>
+
+            <!-- Type -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Type</label>
+              <select data-wish-calculator-target="typeInput" data-action="change->wish-calculator#updateTypeFields" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                <option value="target_date">Target Date</option>
+                <option value="sequential">Sequential</option>
+                <option value="percentage">Percentage</option>
+              </select>
+            </div>
+
+            <!-- Target Date (conditional) -->
+            <div class="field-group sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700">Target Date</label>
+              <input type="date" data-wish-calculator-target="targetDateInput" data-action="change->wish-calculator#updatePreview" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+            </div>
+
+            <!-- Sequential Order (conditional) -->
+            <div class="field-group sm:col-span-2 hidden">
+              <label class="block text-sm font-medium text-gray-700">Priority Order</label>
+              <input type="number" data-wish-calculator-target="sequentialOrderInput" data-action="input->wish-calculator#updatePreview" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="1">
+            </div>
+
+            <!-- Percentage (conditional) -->
+            <div class="field-group sm:col-span-2 hidden">
+              <label class="block text-sm font-medium text-gray-700">Percentage (%)</label>
+              <input type="number" step="0.01" max="100" data-wish-calculator-target="percentageInput" data-action="input->wish-calculator#updatePreview" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="50">
+            </div>
+
+            <!-- Preview -->
+            <div class="sm:col-span-2">
+              <h4 class="text-sm font-medium text-gray-700 mb-2">Preview</h4>
+              <div data-wish-calculator-target="preview" class="bg-gray-50 rounded-lg p-4">
+                <p class="text-sm text-gray-500">Fill out the form to see a preview...</p>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="sm:col-span-2 flex gap-3">
+              <button data-wish-calculator-target="acceptButton" data-action="click->wish-calculator#accept" disabled class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                ✓ Accept & Add
+              </button>
+              <button data-action="click->wish-calculator#reset" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium">
+                ✗ Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
 
       <div class="bg-white shadow sm:rounded-lg">
         <div class="px-4 py-5 sm:p-6">

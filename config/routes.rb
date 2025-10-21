@@ -8,6 +8,9 @@ Rails.application.routes.draw do
   root "dashboard#index"
 
   resources :wish_list_items do
+    collection do
+      post :preview
+    end
     member do
       post :mark_as_purchased
     end
