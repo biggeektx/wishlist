@@ -81,6 +81,18 @@ export default class extends Controller {
       formData.append('percentage', this.percentageInputTarget.value)
     }
 
+    // Capture current filter state from URL params
+    const urlParams = new URLSearchParams(window.location.search)
+    const showIncome = urlParams.get('show_income')
+    const showExpense = urlParams.get('show_expense')
+    const showWishlist = urlParams.get('show_wishlist')
+    const timelinePage = urlParams.get('timeline_page')
+
+    if (showIncome) formData.append('show_income', showIncome)
+    if (showExpense) formData.append('show_expense', showExpense)
+    if (showWishlist) formData.append('show_wishlist', showWishlist)
+    if (timelinePage) formData.append('timeline_page', timelinePage)
+
     try {
       // Store current marker positions before update
       const oldPositions = this.captureMarkerPositions()

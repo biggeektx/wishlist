@@ -2,7 +2,7 @@
   # Build all timeline events (wishlist items, income, expenses)
   all_events = []
 
-  # Add wishlist items
+  # Add wishlist items (unpurchased - future planned purchases)
   allocation_result[:timeline].each do |timeline_item|
     allocation = allocation_result[:allocations].find { |a| a[:item_name] == timeline_item[:item].name }
     if allocation && allocation[:completion_date]
@@ -11,7 +11,22 @@
         item: timeline_item[:item],
         date: allocation[:completion_date],
         item_type: timeline_item[:item].item_type,
-        amount: timeline_item[:item].cost
+        amount: timeline_item[:item].cost,
+        purchased: false
+      }
+    end
+  end
+
+  # Add purchased items (historical)
+  current_user.wish_list_items.purchased.each do |item|
+    if item.purchased_at
+      all_events << {
+        type: 'wishlist',
+        item: item,
+        date: item.purchased_at.to_date,
+        item_type: item.item_type,
+        amount: item.amount_saved,  # Use actual amount paid
+        purchased: true
       }
     end
   end
@@ -36,10 +51,14 @@
     }
   end
 
-  # Sort all events by date
-  all_events.sort_by! { |e| e[:date] }
+  # Sort all events by date, then by type (income first, then expenses, then wishlist)
+  # This ensures on the same day: income is counted before purchases
+  type_order = { 'income' => 1, 'expense' => 2, 'wishlist' => 3 }
+  all_events.sort_by! { |e| [e[:date], type_order[e[:type]]] }
 
   # Calculate cumulative balance over time
+  # Only count actual cash flow (income, expenses, and PAST purchases)
+  # Future planned purchases show hypothetical balance, not actual
   cumulative_balance = 0
   all_events.each do |event|
     case event[:type]
@@ -48,7 +67,13 @@
     when 'expense'
       cumulative_balance -= event[:amount]
     when 'wishlist'
-      cumulative_balance -= event[:amount]
+      # Only deduct from balance if it's a past purchase
+      if event[:purchased]
+        cumulative_balance -= event[:amount]
+      else
+        # For planned purchases, don't change actual balance
+        # The balance shown is "available before this purchase"
+      end
     end
     event[:cumulative_balance] = cumulative_balance
   end
@@ -218,15 +243,23 @@
             text_color = 'text-red-700'
             icon = '↓' # Down arrow for expense
           when 'wishlist'
-            color = 'blue'
-            bg_color = 'bg-blue-500'
-            text_color = 'text-blue-700'
-            # Icons for wishlist item types
-            icon = case event[:item_type]
-              when 'target_date' then '📅'
-              when 'sequential' then '#'
-              when 'percentage' then '%'
-              else '🎁'
+            # Use grey for purchased items, blue for planned items
+            if event[:purchased]
+              color = 'gray'
+              bg_color = 'bg-gray-500'
+              text_color = 'text-gray-700'
+              icon = '✓'  # Checkmark for purchased
+            else
+              color = 'blue'
+              bg_color = 'bg-blue-500'
+              text_color = 'text-blue-700'
+              # Icons for wishlist item types
+              icon = case event[:item_type]
+                when 'target_date' then '📅'
+                when 'sequential' then '#'
+                when 'percentage' then '%'
+                else '🎁'
+              end
             end
           end
 
@@ -327,7 +360,11 @@
     </div>
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-blue-500"></div>
-      <span class="text-gray-600">🎁 Wishlist Items</span>
+      <span class="text-gray-600">🎁 Planned Purchases</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gray-500"></div>
+      <span class="text-gray-600">✓ Past Purchases</span>
     </div>
     <div class="text-gray-500 text-xs ml-4">
       📅 Target Date | # Sequential | % Percentage

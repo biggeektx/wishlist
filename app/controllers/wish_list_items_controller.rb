@@ -204,10 +204,13 @@ class WishListItemsController < ApplicationController
     # Find the preview item in the result
     preview_allocation = result[:allocations].find { |a| a[:item_name] == temp_item.name }
 
-    # Render timeline partial
+    # Render timeline partial with filter params
     timeline_html = render_to_string(
       partial: 'dashboard/timeline',
-      locals: { allocation_result: result },
+      locals: {
+        allocation_result: result,
+        params: params  # Pass params so timeline can maintain filter state
+      },
       formats: [:html]
     )
 

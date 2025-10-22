@@ -152,33 +152,39 @@ class AllocationCalculator
     events.sort_by! { |e| e[:date] }
 
     # Find the earliest date where we can afford the item AND maintain positive balance afterward
+    # Group events by date to get end-of-day balances
     feasible_date = nil
 
-    events.each_with_index do |event, idx|
-      next if event[:date] > target_date  # Don't check dates after target for initial feasibility
+    # Get unique dates from events
+    unique_dates = events.map { |e| e[:date] }.uniq.sort
 
-      # Calculate cumulative balance up to this date
-      balance_at_date = 0
-      events[0..idx].each do |e|
-        balance_at_date += (e[:type] == :income ? e[:amount] : -e[:amount])
+    unique_dates.each do |check_date|
+      next if check_date > target_date  # Don't check dates after target for initial feasibility
+
+      # Calculate balance at END of this date (after all events on this date)
+      balance_at_end_of_day = 0
+      events.each do |e|
+        break if e[:date] > check_date
+        balance_at_end_of_day += (e[:type] == :income ? e[:amount] : -e[:amount])
       end
 
-      # Check if we have enough at this date to buy the item
-      next if balance_at_date < needed
+      # Check if we have enough at end of day to buy the item
+      next if balance_at_end_of_day < needed
 
-      # Simulate buying the item at this date
-      balance_after_purchase = balance_at_date - needed
+      # Simulate buying the item at end of this date
+      balance_after_purchase = balance_at_end_of_day - needed
 
-      # Check if we stay positive through all future expenses
+      # Check if we stay positive through all future events
       future_min_balance = balance_after_purchase
-      events[(idx + 1)..-1].each do |future_event|
+      events.each do |future_event|
+        next if future_event[:date] <= check_date  # Skip events up to and including check date
         balance_after_purchase += (future_event[:type] == :income ? future_event[:amount] : -future_event[:amount])
         future_min_balance = [future_min_balance, balance_after_purchase].min
       end
 
       # If we never go negative, this date works
       if future_min_balance >= 0
-        feasible_date = event[:date]
+        feasible_date = check_date
         break
       end
     end
@@ -215,30 +221,32 @@ class AllocationCalculator
       # Target date not feasible - find next available date where we can buy AND stay positive
       next_completion_date = nil
 
-      # Check all events after target date
-      events.each_with_index do |event, idx|
-        # Calculate cumulative balance up to this date
-        balance_at_date = 0
-        events[0..idx].each do |e|
-          balance_at_date += (e[:type] == :income ? e[:amount] : -e[:amount])
+      # Check all unique dates (using end-of-day balances)
+      unique_dates.each do |check_date|
+        # Calculate balance at END of this date (after all events on this date)
+        balance_at_end_of_day = 0
+        events.each do |e|
+          break if e[:date] > check_date
+          balance_at_end_of_day += (e[:type] == :income ? e[:amount] : -e[:amount])
         end
 
-        # Check if we have enough at this date to buy the item
-        next if balance_at_date < needed
+        # Check if we have enough at end of day to buy the item
+        next if balance_at_end_of_day < needed
 
-        # Simulate buying the item at this date
-        balance_after_purchase = balance_at_date - needed
+        # Simulate buying the item at end of this date
+        balance_after_purchase = balance_at_end_of_day - needed
 
-        # Check if we stay positive through all future expenses
+        # Check if we stay positive through all future events
         future_min_balance = balance_after_purchase
-        events[(idx + 1)..-1].each do |future_event|
+        events.each do |future_event|
+          next if future_event[:date] <= check_date  # Skip events up to and including check date
           balance_after_purchase += (future_event[:type] == :income ? future_event[:amount] : -future_event[:amount])
           future_min_balance = [future_min_balance, balance_after_purchase].min
         end
 
         # If we never go negative, this date works
         if future_min_balance >= 0
-          next_completion_date = event[:date]
+          next_completion_date = check_date
           break
         end
       end
