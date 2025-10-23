@@ -57,8 +57,7 @@
   all_events.sort_by! { |e| [e[:date], type_order[e[:type]]] }
 
   # Calculate cumulative balance over time
-  # Only count actual cash flow (income, expenses, and PAST purchases)
-  # Future planned purchases show hypothetical balance, not actual
+  # Count all cash flow: income, expenses, past purchases, and planned purchases
   cumulative_balance = 0
   all_events.each do |event|
     case event[:type]
@@ -67,13 +66,8 @@
     when 'expense'
       cumulative_balance -= event[:amount]
     when 'wishlist'
-      # Only deduct from balance if it's a past purchase
-      if event[:purchased]
-        cumulative_balance -= event[:amount]
-      else
-        # For planned purchases, don't change actual balance
-        # The balance shown is "available before this purchase"
-      end
+      # Deduct all wishlist purchases (both past and planned) from balance
+      cumulative_balance -= event[:amount]
     end
     event[:cumulative_balance] = cumulative_balance
   end
