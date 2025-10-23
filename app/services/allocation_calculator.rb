@@ -76,7 +76,7 @@ class AllocationCalculator
 
     # Phase 2: Allocate for sequential items
     sequential_items.each do |item|
-      allocation = allocate_sequential(item, remaining_by_date)
+      allocation = allocate_sequential(item, remaining_by_date, result[:allocations])
       result[:allocations] << allocation
       result[:timeline] << {
         item: item,
@@ -92,7 +92,7 @@ class AllocationCalculator
       total_percentage = percentage_items.sum { |i| i.percentage || 0 }
       percentage_items.each do |item|
         weight = item.percentage / total_percentage
-        allocation = allocate_by_percentage(item, remaining_by_date, weight)
+        allocation = allocate_by_percentage(item, remaining_by_date, weight, result[:allocations])
         result[:allocations] << allocation
         result[:timeline] << {
           item: item,
@@ -299,32 +299,83 @@ class AllocationCalculator
     end
   end
 
-  def allocate_sequential(item, net_by_date)
+  def allocate_sequential(item, net_by_date, existing_allocations)
     needed = item.remaining_cost
     allocated = []
     total_allocated = 0
-    cumulative_available = 0
 
-    net_by_date.each do |date, net_amount|
-      # Add this date's net change to our running total
-      cumulative_available += net_amount
+    # Build complete timeline of income, expenses, AND existing allocations to check future balances
+    events = []
+    user.incomes.each do |income|
+      income.occurrences_until(end_date).each do |date|
+        events << { date: date, amount: income.amount, type: :income }
+      end
+    end
+    user.expenses.future.each do |expense|
+      events << { date: expense.expense_date, amount: expense.amount, type: :expense }
+    end
 
-      # Only allocate if we have positive funds available
-      next if cumulative_available <= 0
+    # Add existing allocations as future purchases
+    existing_allocations.each do |allocation|
+      if allocation[:completion_date] && allocation[:amount_allocated] && allocation[:amount_allocated] > 0
+        events << { date: allocation[:completion_date], amount: allocation[:amount_allocated], type: :wishlist }
+      end
+    end
 
-      # Figure out how much we can allocate from the accumulated funds
-      allocation_amount = [cumulative_available, needed - total_allocated].min
+    events.sort_by! { |e| e[:date] }
 
-      if allocation_amount > 0
-        allocated << {
-          date: date,
-          amount: allocation_amount.round(2)
-        }
-        total_allocated += allocation_amount
-        cumulative_available -= allocation_amount
+    # Get unique dates sorted
+    unique_dates = events.map { |e| e[:date] }.uniq.sort
+
+    # Find the earliest date where we can afford the full item AND maintain positive balance afterward
+    completion_date = nil
+
+    unique_dates.each do |check_date|
+      # Calculate balance at END of this date (after all events on this date)
+      balance_at_end_of_day = 0
+      events.each do |e|
+        break if e[:date] > check_date
+        case e[:type]
+        when :income
+          balance_at_end_of_day += e[:amount]
+        when :expense, :wishlist
+          balance_at_end_of_day -= e[:amount]
+        end
       end
 
-      break if total_allocated >= needed
+      # Check if we have enough at end of day to buy the full item
+      next if balance_at_end_of_day < needed
+
+      # Simulate buying the item at end of this date
+      balance_after_purchase = balance_at_end_of_day - needed
+
+      # Check if we stay positive through all future events
+      future_min_balance = balance_after_purchase
+      events.each do |future_event|
+        next if future_event[:date] <= check_date
+        case future_event[:type]
+        when :income
+          balance_after_purchase += future_event[:amount]
+        when :expense, :wishlist
+          balance_after_purchase -= future_event[:amount]
+        end
+        future_min_balance = [future_min_balance, balance_after_purchase].min
+      end
+
+      # If we never go negative, this date works
+      if future_min_balance >= 0
+        completion_date = check_date
+        break
+      end
+    end
+
+    # If we found a feasible date, allocate the full amount to that date
+    if completion_date
+      allocated << {
+        date: completion_date,
+        amount: needed.round(2)
+      }
+      total_allocated = needed
     end
 
     {
@@ -333,36 +384,87 @@ class AllocationCalculator
       item_cost: item.cost,
       amount_allocated: total_allocated.round(2),
       funded_by: allocated,
-      completion_date: allocated.any? ? allocated.last[:date] : nil
+      completion_date: completion_date
     }
   end
 
-  def allocate_by_percentage(item, net_by_date, weight)
+  def allocate_by_percentage(item, net_by_date, weight, existing_allocations)
     needed = item.remaining_cost
     allocated = []
     total_allocated = 0
-    cumulative_available = 0
 
-    net_by_date.each do |date, net_amount|
-      # Add this date's net change to our running total
-      cumulative_available += net_amount
+    # Build complete timeline of income, expenses, AND existing allocations to check future balances
+    events = []
+    user.incomes.each do |income|
+      income.occurrences_until(end_date).each do |date|
+        events << { date: date, amount: income.amount, type: :income }
+      end
+    end
+    user.expenses.future.each do |expense|
+      events << { date: expense.expense_date, amount: expense.amount, type: :expense }
+    end
 
-      # Only allocate if we have positive funds available
-      next if cumulative_available <= 0
+    # Add existing allocations as future purchases
+    existing_allocations.each do |allocation|
+      if allocation[:completion_date] && allocation[:amount_allocated] && allocation[:amount_allocated] > 0
+        events << { date: allocation[:completion_date], amount: allocation[:amount_allocated], type: :wishlist }
+      end
+    end
 
-      # Allocate proportionally based on weight
-      allocation_amount = [cumulative_available * weight, needed - total_allocated].min
+    events.sort_by! { |e| e[:date] }
 
-      if allocation_amount > 0
-        allocated << {
-          date: date,
-          amount: allocation_amount.round(2)
-        }
-        total_allocated += allocation_amount
-        cumulative_available -= allocation_amount
+    # Get unique dates sorted
+    unique_dates = events.map { |e| e[:date] }.uniq.sort
+
+    # Find the earliest date where we can afford the full item AND maintain positive balance afterward
+    completion_date = nil
+
+    unique_dates.each do |check_date|
+      # Calculate balance at END of this date (after all events on this date)
+      balance_at_end_of_day = 0
+      events.each do |e|
+        break if e[:date] > check_date
+        case e[:type]
+        when :income
+          balance_at_end_of_day += e[:amount]
+        when :expense, :wishlist
+          balance_at_end_of_day -= e[:amount]
+        end
       end
 
-      break if total_allocated >= needed
+      # Check if we have enough at end of day to buy the full item
+      next if balance_at_end_of_day < needed
+
+      # Simulate buying the item at end of this date
+      balance_after_purchase = balance_at_end_of_day - needed
+
+      # Check if we stay positive through all future events
+      future_min_balance = balance_after_purchase
+      events.each do |future_event|
+        next if future_event[:date] <= check_date
+        case future_event[:type]
+        when :income
+          balance_after_purchase += future_event[:amount]
+        when :expense, :wishlist
+          balance_after_purchase -= future_event[:amount]
+        end
+        future_min_balance = [future_min_balance, balance_after_purchase].min
+      end
+
+      # If we never go negative, this date works
+      if future_min_balance >= 0
+        completion_date = check_date
+        break
+      end
+    end
+
+    # If we found a feasible date, allocate the full amount to that date
+    if completion_date
+      allocated << {
+        date: completion_date,
+        amount: needed.round(2)
+      }
+      total_allocated = needed
     end
 
     {
@@ -372,7 +474,7 @@ class AllocationCalculator
       percentage: item.percentage,
       amount_allocated: total_allocated.round(2),
       funded_by: allocated,
-      completion_date: allocated.any? ? allocated.last[:date] : nil
+      completion_date: completion_date
     }
   end
 
